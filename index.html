@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' https://*.workers.dev; img-src 'self' blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Fluir · ideias em movimento</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header><a class="brand" href="./" aria-label="Fluir, início"><span aria-hidden="true">✳</span> fluir<span class="dot">.</span></a><span class="header-tag">SEU FLUXO, ONDE VOCÊ ESTIVER</span></header>
+  <main>
+    <section class="intro"><p class="eyebrow">DO CELULAR PARA O SEU ESTÚDIO</p><h1>A ideia chegou?<br><em>Deixa fluir.</em></h1><p>Guarde a mensagem, os prints e os combinados.<br>Quando abrir o Fluir, tudo espera por você.</p><div class="flow"><span>01 · Envie</span><i>→</i><span>02 · Revise no PC</span><i>→</i><span>03 · Crie</span></div><div class="petal" aria-hidden="true">✳</div></section>
+    <section class="card" aria-labelledby="card-title">
+      <div class="card-heading"><div><p class="eyebrow">UM LUGAR PARA COMEÇAR</p><h2 id="card-title">Sua caixa de entrada</h2></div><span class="badge" id="connection">Acesso privado</span></div>
+      <p id="notice" role="status" aria-live="polite" hidden></p>
+      <div id="error" role="alert" hidden></div>
+      <form id="login">
+        <p class="help">Entre com sua chave privada para enviar ao seu Fluir.</p>
+        <label for="api">Endereço da caixa de entrada</label><input id="api" type="url" placeholder="https://fluir.sua-conta.workers.dev" maxlength="240" required autocomplete="url">
+        <label for="key">Chave de envio</label><input id="key" type="password" minlength="64" maxlength="64" required autocomplete="off" spellcheck="false" placeholder="Cole sua chave privada">
+        <p class="help">Você encontra esses dados na configuração inicial. A chave vale só nesta aba e não entra no endereço da página.</p>
+        <button class="primary" type="submit">Entrar na minha caixa <span aria-hidden="true">↗</span></button>
+      </form>
+      <div id="workspace" hidden>
+        <form id="submission">
+          <label for="title">Como chamamos este envio?</label><input id="title" required maxlength="160" placeholder="Ex.: Vídeos de novembro · Aurora">
+          <label for="body">Mensagem e briefing</label><textarea id="body" maxlength="100000" rows="8" placeholder="Cliente: Aurora&#10;Artista: Marina&#10;Prazo: sexta-feira&#10;Prioridade: alta&#10;&#10;1. Vídeo de lançamento&#10;2. Vídeo de bastidores&#10;&#10;Cole também os links e os valores combinados."></textarea>
+          <div class="upload"><label for="images">＋ Adicionar prints</label><input id="images" type="file" accept="image/png,image/jpeg,image/webp" multiple><small>Até 4 prints · PNG, JPG ou WEBP · até 15 MB de origem por print.</small></div>
+          <div id="previews"></div><p class="help">Os prints serão otimizados antes do envio, até 1 MB cada. Confira se os textos continuam legíveis.</p>
+          <button class="primary" id="send" type="submit">Enviar para o Fluir <span aria-hidden="true">↗</span></button>
+          <p class="help">A separação em demandas, os nomes, prazos e valores serão revisados no computador. Só então a cópia da nuvem será removida.</p>
+        </form>
+        <div class="inbox-heading"><h3>Aguardando no Fluir</h3><button class="text-button" id="refresh" type="button">Atualizar</button></div><div id="pending"></div><button class="text-button" id="logout" type="button">Sair desta aba</button>
+      </div>
+    </section>
+  </main>
+  <footer><span class="footer-flower" aria-hidden="true">✳</span><p>Menos ideias perdidas.<br>Mais espaço para criar.</p><small>A tela de entrada é pública. Mensagens e prints exigem sua chave privada.</small></footer>
+</body>
+</html>
