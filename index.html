@@ -9,6 +9,9 @@
   <title>Fluir · ideias em movimento</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <script src="intake-fields.js" defer></script>
+  <script src="intake.js" defer></script>
+  <script src="review.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -23,19 +26,23 @@
         <p class="help">Entre com sua chave privada para enviar ao seu Fluir.</p>
         <label for="api">Endereço da caixa de entrada</label><input id="api" type="url" placeholder="https://fluir.sua-conta.workers.dev" maxlength="240" required autocomplete="url">
         <label for="key">Chave de envio</label><input id="key" type="password" minlength="64" maxlength="64" required autocomplete="off" spellcheck="false" placeholder="Cole sua chave privada">
-        <p class="help">Você encontra esses dados na configuração inicial. A chave vale só nesta aba e não entra no endereço da página.</p>
+        <label class="remember-option" for="remember"><input id="remember" type="checkbox"><span>Lembrar acesso neste dispositivo</span></label>
+        <p class="help">Marque apenas no seu dispositivo pessoal. Ao sair, o acesso salvo será apagado. A chave não entra no endereço da página.</p>
+        <p class="help">Após entrar, você poderá colar uma mensagem, separar as demandas e conferir cada ficha antes de enviar.</p>
         <button class="primary" type="submit">Entrar na minha caixa <span aria-hidden="true">↗</span></button>
       </form>
       <div id="workspace" hidden>
         <form id="submission">
           <label for="title">Como chamamos este envio?</label><input id="title" required maxlength="160" placeholder="Ex.: Vídeos de novembro · Aurora">
-          <label for="body">Mensagem e briefing</label><textarea id="body" maxlength="100000" rows="8" placeholder="Cliente: Aurora&#10;Artista: Marina&#10;Prazo: sexta-feira&#10;Prioridade: alta&#10;&#10;1. Vídeo de lançamento&#10;2. Vídeo de bastidores&#10;&#10;Cole também os links e os valores combinados."></textarea>
+          <label for="body">Texto com uma ou várias demandas</label><textarea id="body" maxlength="100000" rows="8" placeholder="Cliente: Aurora&#10;Artista: Marina&#10;Prazo: sexta-feira&#10;Prioridade: alta&#10;&#10;1. Vídeo de lançamento&#10;Briefing: Criar um teaser de 30 segundos.&#10;&#10;2. Vídeo de bastidores&#10;Briefing: Mostrar a preparação da equipe.&#10;&#10;Cole também os links e os valores combinados."></textarea>
+          <div class="separate-actions"><button class="secondary" id="separate" type="button">✳ Separar demandas do texto</button><span id="review-summary" role="status" aria-live="polite">Cole a mensagem para começar.</span></div>
+          <section id="text-review" class="text-review" aria-labelledby="review-title" hidden><div class="review-heading"><p class="eyebrow">CONFERIR ANTES DE ENVIAR</p><h3 id="review-title">Demandas identificadas</h3></div><p class="help">Confira o contexto aplicado às fichas. Para corrigir, edite o texto acima e separe novamente. No computador, você poderá ajustar os campos e vincular pacotes.</p><p id="review-stale" class="review-warning" hidden>O texto mudou. Separe novamente para atualizar as fichas.</p><div id="review-items"></div></section>
           <div class="upload"><label for="images">＋ Adicionar prints</label><input id="images" type="file" accept="image/png,image/jpeg,image/webp" multiple><small>Até 4 prints · PNG, JPG ou WEBP · até 15 MB de origem por print.</small></div>
           <div id="previews"></div><p class="help">Os prints serão otimizados antes do envio, até 1 MB cada. Confira se os textos continuam legíveis.</p>
           <button class="primary" id="send" type="submit">Enviar para o Fluir <span aria-hidden="true">↗</span></button>
-          <p class="help">A separação em demandas, os nomes, prazos e valores serão revisados no computador. Só então a cópia da nuvem será removida.</p>
+          <p class="help">O texto completo segue junto para a confirmação no Fluir. Prints serão lidos no computador. A cópia da nuvem só será removida depois de salvar as demandas.</p>
         </form>
-        <div class="inbox-heading"><h3>Aguardando no Fluir</h3><button class="text-button" id="refresh" type="button">Atualizar</button></div><div id="pending"></div><button class="text-button" id="logout" type="button">Sair desta aba</button>
+        <div class="inbox-heading"><h3>Aguardando no Fluir</h3><button class="text-button" id="refresh" type="button">Atualizar</button></div><div id="pending"></div><button class="text-button" id="logout" type="button">Sair e esquecer acesso</button>
       </div>
     </section>
   </main>

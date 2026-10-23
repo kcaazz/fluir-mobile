@@ -2,6 +2,27 @@
 const $ = selector => document.querySelector(selector);
 const CHUNK = 65536;
 let session = null; let images = []; let busy = false; let job = null;
+const SESSION_KEY = 'fluir.mobile.session';
+const REMEMBER_KEY = 'fluir.mobile.remembered';
+const review = window.FluirTextReview.create({ text: $('#body'), onChange: updateSend });
+function updateSend() {
+  const count = $('#body').value.trim() && review.ready ? review.count : 0;
+  $('#send').disabled = busy || !session || !review.ready || (!$('#body').value.trim() && !images.length);
+  $('#separate').disabled = busy || !$('#body').value.trim();
+  $('#send').firstChild.textContent = busy ? 'Enviando… ' : count ? `Enviar ${count} demanda${count === 1 ? '' : 's'} para o Fluir ` : 'Enviar para o Fluir ';
+}
+function forgetAccess() {
+  try { sessionStorage.removeItem(SESSION_KEY); } catch { /* Storage may be blocked. */ }
+  try { localStorage.removeItem(REMEMBER_KEY); } catch { /* Storage may be blocked. */ }
+}
+function storedAccess(storage, key) {
+  try {
+    const record = JSON.parse(storage.getItem(key) || 'null');
+    if (!record) return null;
+    if (typeof record.api !== 'string' || !/^[a-f0-9]{64}$/.test(record.key || '')) throw new Error('Invalid stored session');
+    return { api: apiUrl(record.api), key: record.key, remember: key === REMEMBER_KEY || record.remember === true };
+  } catch { try { storage.removeItem(key); } catch { /* Storage may be blocked. */ } return null; }
+}
 function apiUrl(value) {
   const url = new URL(value);
   if (url.protocol !== 'https:' || !/^[a-z0-9-]+\.[a-z0-9-]+\.workers\.dev$/.test(url.hostname) || url.username || url.password || url.port || url.search || url.hash || url.pathname !== '/') throw new Error('Use o endereço principal da sua caixa: https://fluir.sua-conta.workers.dev.');
@@ -13,15 +34,16 @@ function error(err) { $('#error').textContent = err.message || 'Não foi possív
 async function run(fn) {
   if (busy) return; busy = true; $('#error').hidden = true;
   document.querySelectorAll('button,input,textarea').forEach(el => { el.disabled = true; });
+  updateSend();
   try { await fn(); } catch (err) { error(err); }
-  finally { busy = false; document.querySelectorAll('button,input,textarea').forEach(el => { el.disabled = false; }); }
+  finally { busy = false; document.querySelectorAll('button,input,textarea').forEach(el => { el.disabled = false; }); updateSend(); }
 }
 async function request(route, method = 'GET', body) {
   let response;
   try { response = await fetch(`${session.api}${route}`, { method, headers: { Authorization: `Bearer ${session.key}`, ...(body ? { 'Content-Type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined, redirect: 'error', cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(30000) }); }
   catch { throw new Error('Sem conexão com a caixa. Seu texto continua nesta tela; tente novamente.'); }
   let result; try { result = await response.json(); } catch { throw new Error('O serviço não respondeu corretamente. Tente novamente.'); }
-  if (!response.ok) throw new Error(result.error || 'O serviço recusou o envio.');
+  if (!response.ok) throw Object.assign(new Error(result.error || 'O serviço recusou o envio.'), { status: response.status });
   return result;
 }
 async function pending() {
@@ -36,17 +58,25 @@ async function pending() {
     div.append(title, date); $('#pending').append(div);
   }
 }
-async function login(api, key) {
+async function login(api, key, remember = false) {
   session = { api: apiUrl(api), key: key.trim() };
   if (!/^[a-f0-9]{64}$/.test(session.key)) { session = null; throw new Error('Cole a chave privada de envio completa.'); }
   try {
     const info = await request('/session');
-    if (info.role !== 'send') throw new Error('Use a chave de envio no celular. A chave de recebimento fica no computador.');
+    if (info.role !== 'send') throw Object.assign(new Error('Use a chave de envio no celular. A chave de recebimento fica no computador.'), { status: 403 });
   } catch (err) { session = null; throw err; }
-  // Session storage holds this tab's session. Only the non-secret address is remembered across sessions.
-  try { sessionStorage.setItem('fluir.mobile.session', JSON.stringify(session)); localStorage.setItem('fluir.mobile.api', session.api); } catch { /* Private browsing can disable storage. */ }
+  // Persistent credentials are saved only after explicit opt-in on this device.
+  let remembered = false;
+  if (remember) {
+    try { localStorage.setItem(REMEMBER_KEY, JSON.stringify(session)); remembered = true; } catch { /* Report unavailable storage without blocking login. */ }
+  } else { try { localStorage.removeItem(REMEMBER_KEY); } catch { /* Storage may be blocked. */ } }
+  try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...session, remember: remembered })); } catch { /* Login can work without browser storage. */ }
+  try { localStorage.setItem('fluir.mobile.api', session.api); } catch { /* Address storage is optional. */ }
+  $('#remember').checked = remembered;
   $('#key').value = ''; $('#login').hidden = true; $('#workspace').hidden = false; $('#connection').textContent = 'Conectado';
-  notice('Sua caixa está pronta para receber.'); await pending();
+  notice(remember && !remembered ? 'Você entrou, mas este navegador não permitiu lembrar o acesso. Use esta aba ou confira suas configurações de armazenamento.' : remembered ? 'Acesso lembrado neste dispositivo. Cole seu texto e separe as demandas para conferir.' : 'Sua caixa está pronta para receber. Cole seu texto e separe as demandas para conferir.');
+  // A list refresh failure must not make a successful login look unsuccessful.
+  try { await pending(); } catch (err) { error(err); }
 }
 function resetImages() { images.forEach(img => URL.revokeObjectURL(img.url)); images = []; renderImages(); }
 function renderImages() {
@@ -82,7 +112,13 @@ async function prepareImage(file) {
   return { name: file.name.slice(0, 120) || 'Print', type: blob.type, size: bytes.length, sha256: await hash(bytes), bytes, url: URL.createObjectURL(blob) };
 }
 function base64(bytes) { let result = ''; for (const b of bytes) result += String.fromCharCode(b); return btoa(result); }
-$('#login').onsubmit = event => { event.preventDefault(); void run(() => login($('#api').value.trim(), $('#key').value)); };
+$('#login').onsubmit = event => { event.preventDefault(); void run(() => login($('#api').value.trim(), $('#key').value, $('#remember').checked)); };
+$('#separate').onclick = () => {
+  if (busy) return;
+  $('#error').hidden = true;
+  try { const count = review.separate(); notice(`${count} demanda${count === 1 ? '' : 's'} identificada${count === 1 ? '' : 's'}. Confira as fichas antes de enviar.`); }
+  catch (err) { error(err); }
+};
 $('#images').onchange = event => {
   const files = [...event.target.files];
   void run(async () => {
@@ -97,6 +133,8 @@ $('#submission').onsubmit = event => {
   void run(async () => {
     const title = $('#title').value.trim(); const body = $('#body').value.trim();
     if (!title || (!body && !images.length)) throw new Error('Dê um nome ao envio e adicione texto ou um print.');
+    if (!review.ready) throw new Error('Clique em Separar demandas para conferir a mensagem atual antes de enviar.');
+    const demandCount = body ? review.count : 0;
     const payload = { title, body, images: images.map(({ name, type, size, sha256 }) => ({ name, type, size, sha256 })) };
     const fingerprint = JSON.stringify(payload);
     if (!job || job.fingerprint !== fingerprint) job = { id: crypto.randomUUID(), fingerprint };
@@ -110,19 +148,30 @@ $('#submission').onsubmit = event => {
       }
       await request(`/submissions/${job.id}/complete`, 'POST', {});
     }
-    $('#submission').reset(); resetImages(); job = null;
-    notice('Enviado! Abra “Do celular” no Fluir para separar e revisar as demandas.');
+    $('#submission').reset(); resetImages(); job = null; review.reset();
+    notice(demandCount ? `Enviado! ${demandCount} demanda${demandCount === 1 ? '' : 's'} no lote. Abra “Do celular” no Fluir para confirmar e salvar as fichas.` : 'Enviado! Abra “Do celular” no Fluir para ler os prints, separar e revisar as demandas.');
     try { await pending(); } catch { /* A successful send must not be presented as failed if refreshing the list fails. */ }
   });
 };
 $('#refresh').onclick = () => { void run(pending); };
 $('#logout').onclick = () => {
-  if (busy) return; session = null; job = null; try { sessionStorage.removeItem('fluir.mobile.session'); } catch { /* disabled storage */ }
-  $('#submission').reset(); resetImages(); $('#pending').replaceChildren(); $('#workspace').hidden = true; $('#login').hidden = false; $('#connection').textContent = 'Acesso privado'; notice('Você saiu desta aba.');
+  if (busy) return; session = null; job = null; forgetAccess(); $('#remember').checked = false;
+  $('#submission').reset(); resetImages(); review.reset(); $('#pending').replaceChildren(); $('#workspace').hidden = true; $('#login').hidden = false; $('#connection').textContent = 'Acesso privado'; notice('Você saiu. O acesso salvo neste dispositivo foi apagado.');
 };
 window.addEventListener('beforeunload', event => { if (busy || $('#title').value || $('#body').value || images.length) { event.preventDefault(); event.returnValue = ''; } });
 void run(async () => {
-  let cached; try { cached = JSON.parse(sessionStorage.getItem('fluir.mobile.session') || 'null'); $('#api').value = localStorage.getItem('fluir.mobile.api') || ''; } catch { /* optional storage */ }
-  if (cached) { await login(cached.api, cached.key); return; }
-  try { const config = await (await fetch('config.json', { cache: 'no-store' })).json(); if (config.api) $('#api').value = apiUrl(config.api); } catch { /* Address can always be entered manually. */ }
+  let cached;
+  try {
+    const remembered = storedAccess(localStorage, REMEMBER_KEY);
+    cached = storedAccess(sessionStorage, SESSION_KEY) || remembered;
+    // Logging out in another tab must not silently restore persistent access.
+    if (cached?.remember && (!remembered || remembered.api !== cached.api || remembered.key !== cached.key)) cached.remember = false;
+    $('#api').value = localStorage.getItem('fluir.mobile.api') || '';
+  } catch { /* Access to storage itself can be disabled. */ }
+  if (cached) {
+    $('#api').value = cached.api; $('#remember').checked = cached.remember;
+    try { await login(cached.api, cached.key, cached.remember); return; }
+    catch (err) { if ([401, 403].includes(err.status)) { forgetAccess(); $('#remember').checked = false; } error(err); }
+  }
+  try { const config = await (await fetch('config.json', { cache: 'no-store', signal: AbortSignal.timeout(10000) })).json(); if (config.api && !$('#api').value) $('#api').value = apiUrl(config.api); } catch { /* Address can always be entered manually. */ }
 });
